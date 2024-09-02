@@ -2,12 +2,13 @@
 import themes from "./themes";
 import PositionedCharacter from "./PositionedCharacter";
 import { generateTeam } from "./generators";
-import Bowman from "./characters/bowman";
-import Swordsman from "./characters/swordsman";
-import Magician from "./characters/magician";
-import Vampire from "./characters/vampire";
-import Undead from "./characters/undead";
-import Daemon from "./characters/daemon";
+import Bowman from "./characters/Bowman";
+import Swordsman from "./characters/Swordsman";
+import Magician from "./characters/Magician";
+import Vampire from "./characters/Vampire";
+import Undead from "./characters/Undead";
+import Daemon from "./characters/Daemon";
+import Team from "./Team";
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -18,20 +19,40 @@ export default class GameController {
   init() {
     this.gamePlay.drawUi(themes.prairie);
 
-    const playerTeam = generateTeam([Bowman, Swordsman, Magician], 1, 2);
-    const opponentTeam = generateTeam([Vampire, Undead, Daemon], 1, 2);
+    const playerTypes = [Bowman, Swordsman, Magician];
+    const enemyTypes = [Vampire, Undead, Daemon];
 
-    const positionedPlayerCharacters = playerTeam.characters.map(
-      (character, index) => new PositionedCharacter(character, index)
-    );
-    const positionedOpponentCharacters = opponentTeam.characters.map(
-      (character, index) => new PositionedCharacter(character, 56 + index)
-    );
+    const playerTeam = new Team(generateTeam(playerTypes, 3, 2));
+    const enemyTeam = new Team(generateTeam(enemyTypes, 3, 2));
 
-    this.gamePlay.redrawPositions([
-      ...positionedPlayerCharacters,
-      ...positionedOpponentCharacters,
-    ]);
+    const positionedCharacters = [];
+
+    const occupiedPositions = new Set();
+
+    // Функция для генерации уникальной позиции
+    const generateUniquePosition = (startCol, endCol) => {
+      let position;
+      do {
+        const row = Math.floor(Math.random() * 8);
+        const col =
+          startCol + Math.floor(Math.random() * (endCol - startCol + 1));
+        position = row * 8 + col;
+      } while (occupiedPositions.has(position));
+      occupiedPositions.add(position);
+      return position;
+    };
+
+    playerTeam.characters.forEach((character) => {
+      const position = generateUniquePosition(0, 1);
+      positionedCharacters.push(new PositionedCharacter(character, position));
+    });
+
+    enemyTeam.characters.forEach((character) => {
+      const position = generateUniquePosition(6, 7);
+      positionedCharacters.push(new PositionedCharacter(character, position));
+    });
+
+    this.gamePlay.redrawPositions(positionedCharacters);
   }
 
   onCellClick(index) {

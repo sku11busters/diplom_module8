@@ -1,5 +1,4 @@
 const path = require("path");
-const ESLintWebpackPlugin = require("eslint-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {

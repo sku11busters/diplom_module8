@@ -11,10 +11,9 @@ import Team from "./Team";
  */
 export function* characterGenerator(allowedTypes, maxLevel) {
   while (true) {
-    const CharacterClass =
-      allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
+    const Type = allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
     const level = Math.floor(Math.random() * maxLevel) + 1;
-    yield new CharacterClass(level);
+    yield new Type(level);
   }
 }
 
@@ -26,11 +25,11 @@ export function* characterGenerator(allowedTypes, maxLevel) {
  * @returns экземпляр Team, хранящий экземпляры персонажей. Количество персонажей в команде - characterCount
  * */
 
-export function generateTeam(allowedTypes, maxLevel, count) {
+export function generateTeam(allowedTypes, maxLevel, characterCount) {
+  const team = [];
   const generator = characterGenerator(allowedTypes, maxLevel);
-  const characters = [];
-  for (let i = 0; i < count; i++) {
-    characters.push(generator.next().value);
+  for (let i = 0; i < characterCount; i++) {
+    team.push(generator.next().value);
   }
-  return new Team(characters);
+  return team;
 }
