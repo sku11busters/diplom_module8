@@ -13,7 +13,7 @@
  * vampire
  */
 export default class Character {
-  constructor(level, attack, defence, health, type = "generic") {
+  constructor(level = 1) {
     if (new.target === Character) {
       throw new Error(
         "Cannot instantiate Character directly. Please use a subclass."
@@ -21,9 +21,21 @@ export default class Character {
     }
 
     this.level = level;
-    this.attack = attack;
-    this.defence = defence;
-    this.health = health;
-    this.type = type;
+    this.attack = this.calculateAttack(level);
+    this.defence = this.calculateDefence(level);
+    this.health = Math.min(100, this.calculateHealth(level)); 
+    this.type = this.constructor.name.toLowerCase();
+  }
+
+  calculateAttack(level) {
+    return 10 + level * 5; 
+  }
+
+  calculateDefence(level) {
+    return 5 + level * 3; 
+  }
+
+  calculateHealth(level) {
+    return level + 80; 
   }
 }
