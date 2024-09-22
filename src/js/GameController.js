@@ -133,6 +133,8 @@ export default class GameController {
       if (!character && moveDistance > maxMoveDistance) {
         GamePlay.showError("Недопустимое перемещение");
       }
+
+      // this.computerTurn();
     }
   }
 
@@ -165,6 +167,10 @@ export default class GameController {
     const actions = [];
 
     computerCharacters.forEach((attackingCharacter) => {
+      let target = null;
+      let moveToIndex = null;
+
+      // Находим доступных для атаки персонажей
       const availableTargets = playerCharacters.filter((targetCharacter) => {
         const attackDistance = this.calculateDistance(
           attackingCharacter.position,
@@ -180,34 +186,35 @@ export default class GameController {
       });
 
       if (availableTargets.length > 0) {
-        const weakestTarget = this.findWeakestCharacter(availableTargets);
+        // Выбираем самый слабый персонаж для атаки
+        target = this.findWeakestCharacter(availableTargets);
+      } else {
+        // Если атака невозможна, ищем ближайшую позицию для перемещения
+        moveToIndex = this.findClosestPositionToEnemy(
+          attackingCharacter,
+          playerCharacters
+        );
+      }
+
+      if (target) {
         actions.push({
           attacker: attackingCharacter,
-          target: weakestTarget,
+          target: target,
+        });
+      } else if (moveToIndex !== null) {
+        actions.push({
+          attacker: attackingCharacter,
+          moveToIndex: moveToIndex,
         });
       }
     });
 
-    actions.forEach(({ attacker, target }) => {
-      const damage = Math.max(
-        attacker.character.attack - target.character.defence,
-        attacker.character.attack * 0.1
-      );
-      const targetIndex = this.positionedCharacters.find(
-        (pc) => pc.character === target.character
-      ).position;
-
-      this.gamePlay.showDamage(targetIndex, damage).then(() => {
-        target.character.health -= damage;
-
-        if (target.character.health <= 0) {
-          this.positionedCharacters = this.positionedCharacters.filter(
-            (pc) => pc.character !== target.character
-          );
-        }
-
-        this.gamePlay.redrawPositions(this.positionedCharacters);
-      });
+    actions.forEach((action) => {
+      if (action.target) {
+        this.attackCharacter(action.target.character, action.target.position);
+      } else if (action.moveToIndex !== null) {
+        this.moveCharacterToIndex(action.attacker, action.moveToIndex);
+      }
     });
 
     if (
@@ -221,6 +228,71 @@ export default class GameController {
       this.levelUp();
       this.newGame();
     }
+  }
+
+  findClosestPositionToEnemy(attackingCharacter, playerCharacters) {
+    let closestDistance = Infinity;
+    let closestPosition = null;
+
+    playerCharacters.forEach((playerCharacter) => {
+      const playerPosition = this.positionedCharacters.find(
+        (pc) => pc.character === playerCharacter.character
+      ).position;
+      const distance = this.calculateDistance(
+        attackingCharacter.position,
+        playerPosition
+      );
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPosition = playerPosition;
+      }
+    });
+
+    // Проверяем, есть ли свободные клетки вокруг ближайшего персонажа игрока
+    const adjacentPositions = this.getAdjacentPositions(closestPosition);
+    for (const pos of adjacentPositions) {
+      if (this.isPositionAvailable(pos)) {
+        return pos;
+      }
+    }
+
+    return closestPosition; // Возвращаем позицию самого близкого персонажа, если нет свободных клеток
+  }
+
+  getAdjacentPositions(index) {
+    const positions = [];
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const row = Math.floor(index / 8) + i;
+        const col = (index % 8) + j;
+        if (
+          row >= 0 &&
+          row < 8 &&
+          col >= 0 &&
+          col < 8 &&
+          (i !== 0 || j !== 0)
+        ) {
+          positions.push(row * 8 + col);
+        }
+      }
+    }
+    return positions;
+  }
+
+  isPositionAvailable(index) {
+    return !this.positionedCharacters.some((pc) => pc.position === index);
+  }
+
+  moveCharacterToIndex(attacker, index) {
+    const previousIndex = attacker.position;
+    this.positionedCharacters = this.positionedCharacters.map((pc) => {
+      if (pc.character === attacker.character) {
+        return new PositionedCharacter(pc.character, index);
+      }
+      return pc;
+    });
+    this.gamePlay.redrawPositions(this.positionedCharacters);
   }
 
   initTeams() {
@@ -254,6 +326,7 @@ export default class GameController {
 
     enemyTeam.characters.forEach((character) => {
       const position = generateUniquePosition(6, 7);
+
       positionedCharacters.push(new PositionedCharacter(character, position));
     });
 
@@ -305,7 +378,9 @@ export default class GameController {
         } else {
           this.gamePlay.setCursor(cursors.notallowed);
         }
+
         const enemy = this.findCharacterByPosition(index);
+        console.log(enemy);
         if (
           enemy &&
           !["bowman", "swordsman", "magician"].includes(enemy.type)
@@ -407,27 +482,38 @@ export default class GameController {
   }
 
   updateCharacterPositions() {
+    // Перерисовываем всех персонажей на поле, что включает в себя обновление их здоровья
     this.gamePlay.redrawPositions(this.positionedCharacters);
   }
 
   async attackCharacter(enemy, index) {
     const attacker = this.selectedCharacter;
-
     const damage = Math.max(
       attacker.attack - enemy.defence,
       attacker.attack * 0.1
     );
 
+    // Ожидаем завершения анимации урона перед обновлением здоровья персонажа
     await this.gamePlay.showDamage(index, damage);
 
+    // После завершения анимации урона уменьшаем здоровье персонажа
     enemy.health -= damage;
 
+    // Обновляем отображение всех персонажей на поле
+    this.updateCharacterPositions();
+
+    // Проверяем, не пора ли персонаж после удара
     if (enemy.health <= 0) {
+      // Удаляем персонажа из списка позиционированных персонажей
       this.positionedCharacters = this.positionedCharacters.filter(
         (pc) => pc.character !== enemy
       );
+      // Обновляем отображение персонажей на поле снова, чтобы удалить мертвого персонажа
       this.updateCharacterPositions();
     }
+
+    // После атаки можно добавить логику перехода к следующему ходу
+    // Например, переключиться на ход компьютера или следующего игрока
   }
 
   levelUp() {
